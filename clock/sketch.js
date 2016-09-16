@@ -1,6 +1,7 @@
 BD = [10,10,790,600]
 G = 1
 stks = []
+stkpool = []
 sl = 35
 sw = 6
 c1 = [95,90,85]
@@ -75,9 +76,10 @@ var Stk = function (x,y,l,a){
   this.phys = true
   this.sup = [-1,-1]
   
-  this.targ = {x:-1,y:-1,l:-1,a:-1,fun:null}
+  this.targ = {x:-1,y:-1,l:-1,a:-1,fun:null,args:[]}
   this.v = 10
   this.wasted = false
+  this.id = floor(random(100000))
 }
 
 function endpt (x,y,l,a){
@@ -143,6 +145,7 @@ Stk.prototype.animate = function(){
       this.m1.y += (this.targ.y-this.m1.y)/15
       this.m2.x += (ept.x-this.m2.x)/15
       this.m2.y += (ept.y-this.m2.y)/15
+
       
       //this.m1.appForce(min(15,d1*0.5),atan2(this.targ.y-this.m1.y,this.targ.x-this.m1.x))
       //this.m2.appForce(min(15,d1*0.5),atan2(ept.y-this.m2.y,ept.x-this.m2.x))
@@ -155,85 +158,13 @@ Stk.prototype.animate = function(){
       this.targ.x = -1
       this.targ.y = -1
       if (this.targ.fun != null){
-        this.targ.fun()
+        this.targ.fun(this.targ.args)
       }
     }
   }
   
 }
 
-
-
-
-
-
-//STRUCT2
-
-
-function Struct2(stk1,stk2){
-  this.stk1 = stk1
-  this.stk2 = stk2
-}
-
-Struct2.prototype.update = function(){
-  this.stk1.update()
-  this.stk2.update()
-  //ellipse(this.stk1.m1.x,this.stk1.m1.y,20,20)
-  var d = dist(this.stk1.m1.x,this.stk1.m1.y,this.stk2.m1.x,this.stk2.m1.y)
-  if (abs(d) > 0){
-    var xm = (this.stk1.m1.x+this.stk2.m1.x)/2
-    var ym = (this.stk1.m1.y+this.stk2.m1.y)/2
-    this.stk1.m1.x = xm
-    this.stk2.m1.x = xm
-    this.stk1.m1.y = ym
-    this.stk2.m1.y = ym
-  }
-}
-Struct2.prototype.walk = function(v){
-  this.stk1.appTorque(v-(v<0)*0.5)
-  this.stk2.appTorque(-v+(v>0)*0.5)
-}
-
-
-
-//STRUCT3
-
-
-function Struct3(stk1,stk2,stk3){
-  this.stk1 = stk1
-  this.stk2 = stk2
-  this.stk3 = stk3
-}
-
-Struct3.prototype.update = function(){
-  this.stk1.update()
-  this.stk2.update()
-  this.stk3.update()
-  //ellipse(this.stk1.m1.x,this.stk1.m1.y,20,20)
-
-  var x1 = (this.stk1.m2.x+this.stk2.m1.x)/2
-  var y1 = (this.stk1.m2.y+this.stk2.m1.y)/2
-  this.stk1.m2.x = x1
-  this.stk1.m2.y = y1
-  this.stk2.m1.x = x1
-  this.stk2.m1.y = y1
-
-  var x2 = (this.stk2.m2.x+this.stk3.m1.x)/2
-  var y2 = (this.stk2.m2.y+this.stk3.m1.y)/2
-  this.stk2.m2.x = x2
-  this.stk2.m2.y = y2
-  this.stk3.m1.x = x2
-  this.stk3.m1.y = y2
-
-}
-Struct3.prototype.walk = function(v){
-  if (sin(0.05*frameCount)>0){
-    this.stk1.appTorque(-v)
-    this.stk2.appTorque(-v)
-    this.stk3.appTorque(v)
-    
-  }
-}
 
 
 
@@ -314,10 +245,112 @@ function nbg(){
 }
 
 
+animq = []
+//anim[i] = [id,timeout,func,args]
+function ANIM(){
+  
+  for (var i = animq.length-1; i >=0; i--){
+    if (animq[i][1] > 0){
+      animq[i][1] -= 1
+    }else{
+      //print(animq[i][2])
+      if (stks.indexOf(idstk(animq[i][0]))==-1){
+        stks.push(idstk(animq[i][0]))
+        stkpool.splice(stkpool.indexOf(idstk(animq[i][0])),1)
+      }
+      animq[i][2](animq[i][0],animq[i][3])
+      animq.splice(i,1)
+
+    }
+  }
+}
+function idstk(id){
+  for (var i = 0; i < stks.length; i++){
+    if (stks[i].id == id){
+      return stks[i]
+    }
+  }
+  for (var i = 0; i < stkpool.length; i++){
+    if (stkpool[i].id == id){
+      return stkpool[i]
+    }
+  }
+  print("Invalid stick")
+  print("Your stick id: "+id)
+  print("All id list:")
+  for (var i = 0; i < stks.length; i++){
+    print("stk "+i+" : "+stks[i].id)
+  } 
+  for (var i = 0; i < stkpool.length; i++){
+    print("stk "+i+" : "+stkpool[i].id)
+  } 
+}
+
+function startswing(id,args){
+//args = [fixend,torque,sup,setdigit]
+  var stk = idstk(id)
+  stk.phys = true
+  stk.l = sl*0.8
+  if (args[0] == 1){
+    stk.m1.fix = {x:true,y:true}
+    stk.m2.fix = {x:false,y:false}
+  }else if (args[0] == 2){
+    stk.m1.fix = {x:false,y:false}
+    stk.m2.fix = {x:true,y:true}    
+  }
+  stk.appTorque(args[1])
+  if (args[3] != undefined){
+    digits[args[2][0]] = args[2]
+    digitstate[args[2][0]] =args[2]
+  }
+}
+
+function stopswing(id,args){
+//args = [fixend,fixpos,sup,setdigit]
+  var stk = idstk(id)
+  if (args[0] == 1){
+    stk.m1.x = args[1][0]
+    stk.m1.y = args[1][1]
+  }else if (args[0] == 2){
+    stk.m2.x = args[1][0]
+    stk.m2.y = args[1][1]   
+  }
+  stk.fullfix() 
+  stk.sup = args[2]
+  if (args[3] != undefined){
+    digits[args[2][0]] = args[3]
+    digitstate[args[2][0]] =args[3]
+  }
+}
+
+function settarg(id,args){
+//args = [targpos,sup,waste,setdigit]
+  var stk = idstk(id)
+  stk.targ = {x:args[0][0],y:args[0][1],l:args[0][2],a:args[0][3],fun:function(a){
+    var s = idstk([a[0]])
+    s.sup = a[1]
+    s.fullfix()
+    if (a[2]){
+      s.wasted = true
+    }
+    if (a[3] != undefined){
+
+      digits[a[1][0]] = a[3]
+      digitstate[a[1][0]] =a[3]
+
+    }
+  },args:[id,args[1],args[2],args[3]]}
+
+}
+
 
 
 function increment(di,wrap){
   var lstk = []
+  var sx = 0
+  var sy = 0
+  var nstk = null
+  var sxy = function(){sx = stk.m1.x;sy = stk.m1.y}
   if (digitstate[di] - floor(digitstate[di]) != 0){
     return
   }
@@ -331,65 +364,31 @@ function increment(di,wrap){
       
       if (digits[di] == 1){
         if (stk.sup[1] == 2){
-          var sx = stk.m1.x
-          var sy = stk.m1.y
-          var nstk = new Stk(sx,sy,sl,-PI/2)
-          nstk.m1.fix = {x:false,y:false}
-          nstk.m2.fix = {x:true,y:true}
-          
-          nstk.appTorque(30)
-          stks.push(nstk)
-          setTimeout(function(){
-            nstk.m1.x = sx-sl
-            nstk.m1.y = sy+sl
-            nstk.fullfix()
-            nstk.sup = [di,3]
-            
-          },220)
-          setTimeout(function(){
-            var tstk = new Stk(sx-sl,sy+sl,sl*0.9,0)
-            tstk.m1.fix = {x:true,y:true}
-            tstk.m2.fix = {x:false,y:false}
-            
-            tstk.appTorque(30)
-            stks.push(tstk)
-            setTimeout(function(){
-              tstk.m2.x = sx-sl
-              tstk.m2.y = sy+sl*2
-              tstk.fullfix()
-              tstk.sup = [di,4]
-              
-            },1500)
-          },300)
-        } else if (stk.sup[1] == 5){
-          console.log("yoyo")
-          var tx = stk.m1.x
-          var ty = stk.m1.y
-          var sstk = stk
-          setTimeout(function(){
-            sstk.m1.fix = {x:false,y:false}
-            sstk.phys = true
-            sstk.appTorque(30)
 
-            setTimeout(function(){
-              sstk.m1.x = tx-sl
-              sstk.m1.y = ty+sl
-              sstk.fullfix()
-              sstk.sup = [di,6]
+          sxy()
+          nstk = new Stk(sx,sy,sl,-PI/2)
+          stks.push(nstk)
+          startswing(nstk.id,[2,30])
+          animq.push([nstk.id,7,stopswing,[1,[sx-sl,sy+sl],[di,3]]])
             
-            },220)
-            
-          },900)
-          var ustk = new Stk(choice([-10,width+10]),BD[3]-10,sl,0)
-          ustk.targ = {x:stk.m1.x-sl,y:stk.m1.y-sl,l:-1,a:0,fun:function(){
-            ustk.sup = [di,0]
-            ustk.fullfix()
-            digits[di] = 2
-            digitstate[di] =2
-          }}
-          stks.push(ustk)
+          nstk = new Stk(sx-sl,sy+sl,sl,0)
+          nstk.fullfix()
+          stkpool.push(nstk)
+          animq.push([nstk.id,30,startswing,[1,0]])
+          animq.push([nstk.id,100,stopswing,[2,[sx-sl,sy+sl*2],[di,4]]])
+        
+        } else if (stk.sup[1] == 5){
           
+          sxy()
+          animq.push([stk.id,60,startswing,[2,30]])
+          animq.push([stk.id,68,stopswing,[1,[sx-sl,sy+sl],[di,6]]])
+          
+          nstk = new Stk(choice([-10,width+10]),BD[3]-10,sl,0)
+          stks.push(nstk)
+          settarg(nstk.id,[[stk.m1.x-sl,stk.m1.y-sl,-1,0],[di,0],false,2])
+ 
         }
+      
       
       // TWO
       
@@ -397,217 +396,105 @@ function increment(di,wrap){
         if (wrap != 3){
           if (stk.sup[1] == 4){
             stk.fullfree()
-            var tstk = stk
-            setTimeout(function(){ tstk.targ.x = choice([-100,width+100]); tstk.targ.fun = function(){tstk.wasted=true}}, 1200);
+            animq.push([stk.id,70,settarg,[[choice([-100,width+100]),-1,-1,-1],[-1,-1],true]])
             
-            //setTimeout(function(){ alert("Hello"); }, 3000);
-            var sx = stk.m1.x
-            var sy = stk.m1.y
-            setTimeout(function(){
-              var nstk = new Stk(sx+sl,sy,sl*0.8,-PI)
-              nstk.m1.fix = {x:true,y:true}
-              nstk.m2.fix = {x:false,y:false}
-              stks.push(nstk)
-              setTimeout(function(){
-                nstk.m2.x = nstk.m1.x
-                nstk.m2.y = nstk.m1.y+sl
-                nstk.fullfix()
-                nstk.sup = [di,5]
-                digits[di] = 3
-                digitstate[di] =3
-              },1500)
-            },600)
+            sxy()
+            nstk = new Stk(sx+sl,sy,sl*0.8,-PI)
+            nstk.fullfix()
+            stks.push(nstk)
+            animq.push([nstk.id,30,startswing,[1,0]])
+            animq.push([nstk.id,100,stopswing,[2,[sx+sl,sy+sl],[di,5],3]])
           }
-          
         }else{
           if (stk.sup[1] == 3){
-            stk.m1.fix = {x:false,y:false}
-            stk.phys = true
-            stk.l = sl*0.8
-            var sstk = stk
-            setTimeout(function(){
-              sstk.m1.x = sstk.m2.x
-              sstk.m1.y = sstk.m2.y
-              sstk.m2.y = sstk.m2.y + sl
-              sstk.fullfix()
-              sstk.sup = [di,5]
-              //digits[di] = 0
-              //digitstate[di] =0
-            },1500)
+            stk.m1.x = stk.m1.x+sl
+            stk.m2.x = stk.m2.x-sl
+            sxy()
+            startswing(stk.id,[1,0])
+            animq.push([stk.id,70,stopswing,[2,[sx,sy+sl],[di,5]]])
+           
           }else if (stk.sup[1] == 0){
-            var sx = stk.m1.x
-            var sy = stk.m1.y
-            var nstk = new Stk(sx,sy,sl*0.8,0)
-            nstk.m1.fix = {x:true,y:true}
-            nstk.m2.fix = {x:false,y:false}
+            sxy()
+            var nstk = new Stk(sx,sy,sl,0)
             stks.push(nstk)
-            setTimeout(function(){
-              nstk.m2.x = nstk.m1.x
-              nstk.m2.y = nstk.m1.y+sl
-              nstk.fullfix()
-              nstk.sup = [di,1]
-              digits[di] = 0
-              digitstate[di] =0
-            },1500)
+            startswing(nstk.id,[1,0])
+            animq.push([nstk.id,80,stopswing,[2,[sx,sy+sl],[di,1],0]])
           }
-          
         }
+        
         
       // THREE  
         
       } else if (digits[di] == 3){
         if (wrap != 4){
             if (stk.sup[1] == 0){
-              stk.m2.fix = {x:false,y:false}
-              stk.l = sl*0.8
-              stk.phys = true
-              var tstk = stk
-              setTimeout(function(){
-                  tstk.m2.x = tstk.m1.x
-                  tstk.m2.y = tstk.m1.y+sl
-                  
-                  tstk.fullfix()
-                  tstk.sup = [di,1]
-                  digits[di] = 4
-                  digitstate[di] =4
-              },1500)
+              sxy()
+              startswing(stk.id,[1,0])
+              animq.push([stk.id,70,stopswing,[2,[sx,sy+sl],[di,1],4]])
+              
             }if (stk.sup[1] == 6){
               stk.fullfree()
-              var sstk = stk
-              setTimeout(function(){ sstk.targ.x = choice([-100,width+100]); sstk.targ.fun = function(){sstk.wasted=true}}, 1200);
+              animq.push([stk.id,70,settarg,[[choice([-100,width+100]),-1,-1,-1],[-1,-1],true]])
             }
         } else{
           if (stk.sup[1] == 3){
-            stk.m2.fix = {x:false,y:false}
-            stk.phys = true
-            stk.l = sl*0.8
-            var sstk = stk
-            setTimeout(function(){
-              sstk.m2.x = sstk.m1.x
-              sstk.m2.y = sstk.m1.y + sl
-              
-              sstk.fullfix()
-              sstk.sup = [di,4]
-              //digits[di] = 0
-              //digitstate[di] =0
-            },1500)
+            
+            sxy()
+            startswing(stk.id,[1,0])
+            animq.push([stk.id,70,stopswing,[2,[sx,sy+sl],[di,4]]])
+           
           }else if (stk.sup[1] == 0){
-            var sx = stk.m1.x
-            var sy = stk.m1.y
-            var nstk = new Stk(sx,sy,sl*0.8,0)
-            nstk.m1.fix = {x:true,y:true}
-            nstk.m2.fix = {x:false,y:false}
+            sxy()
+            var nstk = new Stk(sx,sy,sl,0)
             stks.push(nstk)
-            setTimeout(function(){
-              nstk.m2.x = nstk.m1.x
-              nstk.m2.y = nstk.m1.y+sl
-              nstk.fullfix()
-              nstk.sup = [di,1]
-              digits[di] = 0
-              digitstate[di] =0
-            },1500)
+            startswing(nstk.id,[1,0])
+            animq.push([nstk.id,80,stopswing,[2,[sx,sy+sl],[di,1],0]])
           }
-          
-          
         }
         
         
       // FOUR  
         
-        
       } else if (digits[di] == 4){
         
         if (stk.sup[1] == 2){
-          stk.m1.fix = {x:false,y:false}
-          stk.l = sl*0.8
-          stk.phys = true
-          stk.appTorque(-30)
-          stk.sup[1] = -1
-          var tstk = stk
+          sxy()
+          startswing(stk.id,[2,-30])
+          stk.l = sl*0.9
+          animq.push([stk.id,42,stopswing,[1,[sx,sy+sl*2],[di,5]]])
+          animq.push([stk.id,43,startswing,[1,30]])
+          animq.push([stk.id,52,stopswing,[2,[sx-sl,sy+sl*2],[di,6]]])
           
-          setTimeout(function(){
-              
-            tstk.m1.x = tstk.m2.x
-            tstk.m1.y = tstk.m2.y+sl
-            tstk.l = sl*0.9
-            tstk.m1.fix = {x:true,y:true}
-            
-            tstk.m2.v = {x:0,y:0}
-            tstk.m2.fix = {x:false,y:false}
-            tstk.appTorque(30)
-            
-            setTimeout(function(){
-              tstk.m2.x = tstk.m1.x-sl
-              tstk.m2.y = tstk.m1.y
-              tstk.fullfix()
-              tstk.sup = [di,4]
-              
-            },180)  
-              
-              
-          },700)
-          var nstk = new Stk(choice([-10,width+10]),BD[3]-10,sl,0)
-          nstk.targ = {x:stk.m1.x-sl,y:stk.m1.y,l:-1,a:0,fun:function(){
-            nstk.sup = [di,0]
-            nstk.fullfix()
-            
-            digits[di] = 5
-            digitstate[di] =5
-          }}
+          nstk = new Stk(choice([-10,width+10]),BD[3]-10,sl,0)
           stks.push(nstk)
+          settarg(nstk.id,[[sx-sl,sy,-1,0],[di,0],false,5])
         }
         
       
       // FIVE
-      
-        
+    
       }else if (digits[di] == 5){
         if (wrap != 6){
           if (stk.sup[1] == 3){
-            var sx = stk.m1.x
-            var sy = stk.m1.y
-            var nstk = new Stk(sx,sy,sl*0.8,0)
-            nstk.m1.fix = {x:true,y:true}
-            nstk.m2.fix = {x:false,y:false}
+            sxy()
+            nstk = new Stk(sx,sy,sl,0)
             stks.push(nstk)
-            setTimeout(function(){
-              nstk.m2.x = nstk.m1.x
-              nstk.m2.y = nstk.m1.y+sl
-              nstk.fullfix()
-              nstk.sup = [di,4]
-              digits[di] = 6
-              digitstate[di] =6
-            },1500)
+            startswing(nstk.id,[1,0])
+            animq.push([nstk.id,70,stopswing,[2,[sx,sy+sl],[di,4],6]])
           }
         }else{
           if (stk.sup[1] == 3){
-            stk.m2.fix = {x:false,y:false}
-            stk.phys = true
-            stk.l = sl*0.8
-            var sstk = stk
-            setTimeout(function(){
-              sstk.m2.x = sstk.m1.x
-              sstk.m2.y = sstk.m1.y+sl
-              sstk.fullfix()
-              sstk.sup = [di,4]
-              //digits[di] = 0
-              //digitstate[di] =0
-            },1500)
+            sxy()
+            startswing(stk.id,[1,0])
+            animq.push([stk.id,70,stopswing,[2,[sx,sy+sl],[di,4]]])
+            
           }else if (stk.sup[1] == 0){
-            var sx = stk.m1.x
-            var sy = stk.m1.y
-            var nstk = new Stk(sx+sl,sy,sl*0.8,-PI)
-            nstk.m1.fix = {x:true,y:true}
-            nstk.m2.fix = {x:false,y:false}
+            sxy()
+            
+            nstk = new Stk(sx+sl,sy,sl,-PI)
             stks.push(nstk)
-            setTimeout(function(){
-              nstk.m2.x = nstk.m1.x
-              nstk.m2.y = nstk.m1.y+sl
-              nstk.fullfix()
-              nstk.sup = [di,2]
-              digits[di] = 0
-              digitstate[di] =0
-            },1500)
+            startswing(nstk.id,[1,0])
+            animq.push([nstk.id,70,stopswing,[2,[sx+sl,sy+sl],[di,2],0]])
           }
         }
         
@@ -617,30 +504,17 @@ function increment(di,wrap){
       }else if (digits[di] == 6){
         if (stk.sup[1] == 3 || stk.sup[1] == 4 || stk.sup[1] == 6){
           stk.fullfree()
-          
-          lstk.push(stk)
-          setTimeout(function(){ l1stk = lstk.pop();
-            l1stk.targ.x = choice([-100,width+100]);
-            l1stk.targ.fun = function(){l1stk.wasted=true}}, random(3000)+500);
+          animq.push([stk.id,floor(random(70,300)),settarg,[[choice([-100,width+100]),-1,-1,-1],[-1,-1],true]])
           
         }
         if (stk.sup[1] == 0){
-          var sx = stk.m1.x
-          var sy = stk.m1.y
-          setTimeout(function(){
-            var nstk = new Stk(sx+sl,sy,sl*0.8,-PI)
-            nstk.m1.fix = {x:true,y:true}
-            nstk.m2.fix = {x:false,y:false}
-            stks.push(nstk)
-            setTimeout(function(){
-              nstk.m2.x = nstk.m1.x
-              nstk.m2.y = nstk.m1.y+sl
-              nstk.fullfix()
-              nstk.sup = [di,2]
-              digits[di] = 7
-              digitstate[di] =7
-            },1500)
-          },600)
+          sxy()
+          nstk = new Stk(sx+sl,sy,sl,-PI)
+          nstk.fullfix()
+          stks.push(nstk)
+          animq.push([nstk.id,10,startswing,[1,0]])
+          animq.push([nstk.id,80,stopswing,[2,[sx+sl,sy+sl],[di,2],7]])
+          
         }
         
       // SEVEN  
@@ -648,36 +522,22 @@ function increment(di,wrap){
         
       }else if (digits[di] == 7){
         if (stk.sup[1] == 1){
-          var sx = stk.m1.x
-          var sy = stk.m1.y
-          setTimeout(function(){
-            var nstk = new Stk(sx,sy+sl,sl*0.9,0)
-            nstk.m1.fix = {x:true,y:true}
-            nstk.m2.fix = {x:false,y:false}
-            stks.push(nstk)
-            setTimeout(function(){
-              nstk.m2.x = nstk.m1.x
-              nstk.m2.y = nstk.m1.y+sl
-              nstk.fullfix()
-              nstk.sup = [di,4]
-              
-            },1500)
-          },600)
-          var sstk = new Stk(choice([-10,width+10]),BD[3]-10,sl,0)
-          sstk.targ = {x:sx,y:sy+sl,l:-1,a:0,fun:function(){
-            sstk.sup = [di,3]
-            sstk.fullfix()
-            
-          }}
-          stks.push(sstk)
-          var tstk = new Stk(width+100,BD[3]-10,sl,PI/2)
-          tstk.targ = {x:sx,y:sy+sl*2,l:-1,a:0,fun:function(){
-            tstk.sup = [di,6]
-            tstk.fullfix()
-            digits[di] = 8
-            digitstate[di] =8
-          }}
-          stks.push(tstk)
+          sxy()
+          nstk = new Stk(sx,sy+sl,sl,PI/2)
+          stks.push(nstk)
+          
+          startswing(nstk.id,[1,30])
+          nstk.l = sl*0.9
+          animq.push([nstk.id,90,stopswing,[2,[sx,sy+sl*2],[di,4]]])
+          
+          nstk = new Stk(width+10,BD[3]-10,sl,0)
+          stks.push(nstk)
+          settarg(nstk.id,[[sx,sy+sl,-1,0],[di,3],false])
+          
+          nstk = new Stk(width+100,BD[3]-10,sl,0)
+          stks.push(nstk)
+          settarg(nstk.id,[[sx,sy+sl*2,-1,0],[di,6],false,8])
+          
         }
         
       // EIGHT  
@@ -685,53 +545,47 @@ function increment(di,wrap){
         
       }else if (digits[di] == 8){
         if (stk.sup[1] == 4){
-          stk.phys = true
-          stk.m1.fix = {x:false,y:false}
-          //stk.m2.fix = {x:false,y:false}
-          stk.appTorque(10)
-          stk.sup = [-1,-1]
-          var tstk = stk
-          setTimeout(function(){
-            digits[di] = 9
-            digitstate[di] =9
-          },100)
-          setTimeout(function(){tstk.m2.v = {x:0,y:0};tstk.m2.fix = {x:false,y:false}},900)
-          setTimeout(function(){ tstk.targ.x = choice([-100,width+100]); tstk.targ.fun = function(){tstk.wasted=true}}, 2000);
+          sxy()
+          startswing(stk.id,[2,10])
+          stk.l = sl
+          
+          animq.push([stk.id,60,function(id,args){
+            idstk(id).fullfree()
+            idstk(id).m2.v = {x:0,y:0}
+            digits[args[0]] = 9
+            digitstate[args[0]] = 9
+          },[di]])
+          
+          animq.push([stk.id,120,settarg,[[choice([-100,width+100]),-1,-1,-1],[-1,-1],true]])
+          
         }
         
       // NINE  
         
       }else if (digits[di] == 9){
         if (stk.sup[1] == 3){
-          stk.m2.fix = {x:false,y:false}
-          stk.l = sl*0.8
-          stk.phys = true
-          var tstk = stk
-          setTimeout(function(){
-              tstk.m2.x = tstk.m1.x
-              tstk.m2.y = tstk.m1.y+sl
-              tstk.fullfix()
-              tstk.sup = [di,4]
-              digits[di] = 0
-              digitstate[di] = 0
-          },1500)
+          sxy()
+          startswing(stk.id,[1,0])
+          animq.push([stk.id,70,stopswing,[2,[sx,sy+sl],[di,4],0]])
+          
         }
         
         
       // ZERO  
         
       }else if (digits[di] == 0){
-        if (stk.sup[1] == 0 || stk.sup[1] == 1 || stk.sup[1] == 4 || stk.sup[1] == 6){
+        if (stk.sup[1] == 0){
           stk.fullfree()
-          setTimeout(function(){digits[di] = 1;digitstate[di] = 1},100)
+          animq.push([stk.id,70+random(200),settarg,[[choice([-100,width+100]),-1,-1,-1],[-1,-1],true]])
+          animq.push([stk.id,10,function(id,args){
+            digits[args[0]] = 1
+            digitstate[args[0]] = 1
+          },[di]])
           
-          lstk.push(stk)
-          setTimeout(function(){ 
-            var l1stk = lstk.pop()
-            l1stk.targ.x = choice([-100,width+100]);
-            l1stk.targ.fun = function(){l1stk.wasted=true}; 
-            //l1stk.targ.fun = function(){delete l1stk}
-          }, random(4000)+500);
+        }else if (stk.sup[1] == 1 || stk.sup[1] == 4 || stk.sup[1] == 6){
+          stk.fullfree()
+          animq.push([stk.id,70+random(200),settarg,[[choice([-100,width+100]),-1,-1,-1],[-1,-1],true]])
+          
           
         }
       }
@@ -826,6 +680,7 @@ function draw(){
     }
     //ellipse(stk.m1.x,stk.m1.y,10,10)
   }
+  ANIM()
 
   if (mouseIsPressed){
 
@@ -838,5 +693,5 @@ function mousePressed(){
   //increment(0)
   //increment(1)
   //increment(2)
-  //increment(3)
+  //increment(4)
 }
